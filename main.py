@@ -1,10 +1,10 @@
 import io
 import sys
-import json
-import datetime
+import sqlite3
 from PyQt5 import uic
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QTableWidgetItem
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap, QIcon
 
 template = """<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
@@ -14,12 +14,75 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>600</width>
-    <height>500</height>
+    <width>650</width>
+    <height>600</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Калькулятор расхода топлива</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+   QMainWindow {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #E3F2FD, stop: 1 #BBDEFB);
+   }
+   QGroupBox {
+    font-weight: bold;
+    border: 2px solid #1976D2;
+    border-radius: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    background-color: rgba(255, 255, 255, 200);
+   }
+   QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 5px 0 5px;
+    color: #1976D2;
+   }
+   QPushButton {
+    background-color: #2196F3;
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+   }
+   QPushButton:hover {
+    background-color: #1976D2;
+   }
+   QPushButton:pressed {
+    background-color: #0D47A1;
+   }
+   QPushButton#calculate_btn {
+    background-color: #4CAF50;
+   }
+   QPushButton#calculate_btn:hover {
+    background-color: #45a049;
+   }
+   QPushButton#clear_btn {
+    background-color: #f44336;
+   }
+   QPushButton#clear_btn:hover {
+    background-color: #da190b;
+   }
+   QPushButton#save_btn {
+    background-color: #FF9800;
+   }
+   QPushButton#save_btn:hover {
+    background-color: #e68900;
+   }
+   QLineEdit {
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+   }
+   QLabel {
+    color: #333;
+   }
+   </string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QLabel" name="label">
@@ -27,18 +90,35 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
      <rect>
       <x>30</x>
       <y>20</y>
-      <width>541</width>
-      <height>41</height>
+      <width>591</width>
+      <height>51</height>
      </rect>
     </property>
     <property name="font">
      <font>
       <pointsize>18</pointsize>
+      <weight>75</weight>
       <bold>true</bold>
      </font>
     </property>
     <property name="text">
-     <string>Калькулятор расхода топлива</string>
+     <string>⛽ Калькулятор расхода топлива</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="image_label">
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>80</y>
+      <width>591</width>
+      <height>101</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
     </property>
     <property name="alignment">
      <set>Qt::AlignCenter</set>
@@ -48,8 +128,8 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>70</y>
-      <width>541</width>
+      <y>190</y>
+      <width>591</width>
       <height>171</height>
      </rect>
     </property>
@@ -135,7 +215,7 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
       </rect>
      </property>
      <property name="text">
-      <string>Рассчитать</string>
+      <string>🧮 Рассчитать</string>
      </property>
     </widget>
     <widget class="QPushButton" name="clear_btn">
@@ -148,7 +228,7 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
       </rect>
      </property>
      <property name="text">
-      <string>Очистить</string>
+      <string>🗑️ Очистить</string>
      </property>
     </widget>
     <widget class="QPushButton" name="history_btn">
@@ -161,7 +241,7 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
       </rect>
      </property>
      <property name="text">
-      <string>История расчетов</string>
+      <string>📊 История расчетов</string>
      </property>
     </widget>
    </widget>
@@ -169,8 +249,8 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>250</y>
-      <width>541</width>
+      <y>370</y>
+      <width>591</width>
       <height>191</height>
      </rect>
     </property>
@@ -199,13 +279,14 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
        <height>16</height>
       </rect>
      </property>
-     <property name="text">
-      <string>0.00 л/100км</string>
-     </property>
      <property name="font">
       <font>
+       <weight>75</weight>
        <bold>true</bold>
       </font>
+     </property>
+     <property name="text">
+      <string>0.00 л/100км</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_7">
@@ -230,13 +311,14 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
        <height>16</height>
       </rect>
      </property>
-     <property name="text">
-      <string>0.00 руб</string>
-     </property>
      <property name="font">
       <font>
+       <weight>75</weight>
        <bold>true</bold>
       </font>
+     </property>
+     <property name="text">
+      <string>0.00 руб</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_9">
@@ -261,13 +343,14 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
        <height>16</height>
       </rect>
      </property>
-     <property name="text">
-      <string>0.00 руб/км</string>
-     </property>
      <property name="font">
       <font>
+       <weight>75</weight>
        <bold>true</bold>
       </font>
+     </property>
+     <property name="text">
+      <string>0.00 руб/км</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_11">
@@ -280,20 +363,7 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
       </rect>
      </property>
      <property name="text">
-      <string>Дата расчета:</string>
-     </property>
-    </widget>
-    <widget class="QLabel" name="date_result">
-     <property name="geometry">
-      <rect>
-       <x>220</x>
-       <y>130</y>
-       <width>191</width>
-       <height>16</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>-</string>
+      <string/>
      </property>
     </widget>
     <widget class="QPushButton" name="save_btn">
@@ -306,7 +376,7 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
       </rect>
      </property>
      <property name="text">
-      <string>Сохранить расчет</string>
+      <string>💾 Сохранить расчет</string>
      </property>
     </widget>
    </widget>
@@ -315,121 +385,94 @@ template = """<?xml version="1.0" encoding="UTF-8"?>
  </widget>
  <resources/>
  <connections/>
-</ui>"""
+</ui>
+"""
 
-history_template = """<?xml version="1.0" encoding="UTF-8"?>
-<ui version="4.0">
- <class>HistoryWindow</class>
- <widget class="QMainWindow" name="HistoryWindow">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>700</width>
-    <height>500</height>
-   </rect>
-  </property>
-  <property name="windowTitle">
-   <string>История расчетов</string>
-  </property>
-  <widget class="QWidget" name="centralwidget">
-   <widget class="QLabel" name="label">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>10</y>
-      <width>661</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>16</pointsize>
-      <bold>true</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>История расчетов расхода топлива</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-   </widget>
-   <widget class="QTableWidget" name="history_table">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>50</y>
-      <width>661</width>
-      <height>351</height>
-     </rect>
-    </property>
-    <property name="columnCount">
-     <number>6</number>
-    </property>
-    <property name="rowCount">
-     <number>0</number>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="clear_history_btn">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>410</y>
-      <width>191</width>
-      <height>28</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Очистить историю</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="close_btn">
-    <property name="geometry">
-     <rect>
-      <x>490</x>
-      <y>410</y>
-      <width>191</width>
-      <height>28</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Закрыть</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="export_btn">
-    <property name="geometry">
-     <rect>
-      <x>255</x>
-      <y>410</y>
-      <width>191</width>
-      <height>28</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Экспорт в файл</string>
-    </property>
-   </widget>
-  </widget>
-  <widget class="QStatusBar" name="statusbar"/>
- </widget>
- <resources/>
- <connections/>
-</ui>"""
+
+class DatabaseManager:
+    def __init__(self):
+        self.db_name = "fuel_calculator.db"
+        self.init_database()
+
+    def init_database(self):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS fuel_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                distance REAL NOT NULL,
+                fuel REAL NOT NULL,
+                price REAL NOT NULL,
+                consumption REAL NOT NULL,
+                cost REAL NOT NULL,
+                cost_per_km REAL NOT NULL
+            )
+        ''')
+
+        conn.commit()
+        conn.close()
+
+    def save_calculation(self, record):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO fuel_history 
+            (date, distance, fuel, price, consumption, cost, cost_per_km)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            record['date'], record['distance'], record['fuel'],
+            record['price'], record['consumption'], record['cost'],
+            record['cost_per_km']
+        ))
+
+        conn.commit()
+        conn.close()
+
+    def get_all_history(self):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT date, distance, fuel, price, consumption, cost, cost_per_km
+            FROM fuel_history 
+            ORDER BY date DESC
+        ''')
+
+        records = cursor.fetchall()
+        conn.close()
+
+        return records
+
+    def clear_history(self):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+
+        cursor.execute('DELETE FROM fuel_history')
+
+        conn.commit()
+        conn.close()
 
 
 class HistoryWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
+        self.db = DatabaseManager()
 
         ui_file = io.StringIO(history_template)
         uic.loadUi(ui_file, self)
 
         self.history_table.setHorizontalHeaderLabels([
             "Дата", "Расстояние (км)", "Топливо (л)", "Цена (руб/л)",
-            "Расход (л/100км)", "Стоимость (руб)"
+            "Расход (л/100км)", "Стоимость (руб)", "Цена 1 км (руб)"
         ])
+
+        self.history_table.setAlternatingRowColors(True)
+        self.history_table.setSortingEnabled(True)
+        self.history_table.horizontalHeader().setStretchLastSection(True)
 
         self.clear_history_btn.clicked.connect(self.clear_history)
         self.close_btn.clicked.connect(self.close)
@@ -439,21 +482,22 @@ class HistoryWindow(QMainWindow):
 
     def load_history(self):
         try:
-            with open('.venv/fuel_history.json', 'r', encoding='utf-8') as f:
-                history = json.load(f)
+            records = self.db.get_all_history()
 
-            self.history_table.setRowCount(len(history))
+            self.history_table.setRowCount(len(records))
 
-            for row, record in enumerate(history):
-                self.history_table.setItem(row, 0, QTableWidgetItem(record['date']))
-                self.history_table.setItem(row, 1, QTableWidgetItem(str(record['distance'])))
-                self.history_table.setItem(row, 2, QTableWidgetItem(str(record['fuel'])))
-                self.history_table.setItem(row, 3, QTableWidgetItem(str(record['price'])))
-                self.history_table.setItem(row, 4, QTableWidgetItem(f"{record['consumption']:.2f}"))
-                self.history_table.setItem(row, 5, QTableWidgetItem(f"{record['cost']:.2f}"))
+            for row, record in enumerate(records):
+                self.history_table.setItem(row, 0, QTableWidgetItem(record[0]))
+                self.history_table.setItem(row, 1, QTableWidgetItem(str(record[1])))
+                self.history_table.setItem(row, 2, QTableWidgetItem(str(record[2])))
+                self.history_table.setItem(row, 3, QTableWidgetItem(str(record[3])))
+                self.history_table.setItem(row, 4, QTableWidgetItem(f"{record[4]:.2f}"))
+                self.history_table.setItem(row, 5, QTableWidgetItem(f"{record[5]:.2f}"))
+                self.history_table.setItem(row, 6, QTableWidgetItem(f"{record[6]:.2f}"))
 
-        except FileNotFoundError:
-            QMessageBox.information(self, "Информация", "История расчетов пуста")
+            if not records:
+                QMessageBox.information(self, "Информация", "История расчетов пуста")
+
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки истории: {str(e)}")
 
@@ -464,8 +508,7 @@ class HistoryWindow(QMainWindow):
 
         if reply == QMessageBox.Yes:
             try:
-                with open('.venv/fuel_history.json', 'w', encoding='utf-8') as f:
-                    json.dump([], f)
+                self.db.clear_history()
                 self.history_table.setRowCount(0)
                 QMessageBox.information(self, "Успех", "История очищена")
             except Exception as e:
@@ -473,21 +516,25 @@ class HistoryWindow(QMainWindow):
 
     def export_to_file(self):
         try:
+            records = self.db.get_all_history()
+
+            if not records:
+                QMessageBox.information(self, "Информация", "Нет данных для экспорта")
+                return
+
             with open('fuel_history_export.txt', 'w', encoding='utf-8') as f:
                 f.write("История расчетов расхода топлива\n")
-                f.write("=" * 50 + "\n")
+                f.write("=" * 60 + "\n\n")
 
-                with open('.venv/fuel_history.json', 'r', encoding='utf-8') as history_file:
-                    history = json.load(history_file)
-
-                for record in history:
-                    f.write(f"Дата: {record['date']}\n")
-                    f.write(f"Расстояние: {record['distance']} км\n")
-                    f.write(f"Топливо: {record['fuel']} л\n")
-                    f.write(f"Цена: {record['price']} руб/л\n")
-                    f.write(f"Расход: {record['consumption']:.2f} л/100км\n")
-                    f.write(f"Стоимость: {record['cost']:.2f} руб\n")
-                    f.write("-" * 30 + "\n")
+                for record in records:
+                    f.write(f"Дата: {record[0]}\n")
+                    f.write(f"Расстояние: {record[1]} км\n")
+                    f.write(f"Топливо: {record[2]} л\n")
+                    f.write(f"Цена: {record[3]} руб/л\n")
+                    f.write(f"Расход: {record[4]:.2f} л/100км\n")
+                    f.write(f"Стоимость поездки: {record[5]:.2f} руб\n")
+                    f.write(f"Стоимость 1 км: {record[6]:.2f} руб\n")
+                    f.write("-" * 40 + "\n")
 
             QMessageBox.information(self, "Успех", "Данные экспортированы в файл fuel_history_export.txt")
         except Exception as e:
@@ -501,6 +548,7 @@ class FuelCalculator(QMainWindow):
         ui_file = io.StringIO(template)
         uic.loadUi(ui_file, self)
 
+        self.db = DatabaseManager()
         self.history_window = None
 
         self.calculate_btn.clicked.connect(self.calculate_consumption)
@@ -508,8 +556,33 @@ class FuelCalculator(QMainWindow):
         self.history_btn.clicked.connect(self.show_history)
         self.save_btn.clicked.connect(self.save_calculation)
 
-        self.current_date = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
-        self.date_result.setText(self.current_date)
+
+        self.create_simple_image()
+
+    def create_simple_image(self):
+        from PyQt5.QtGui import QPainter
+        from PyQt5.QtCore import QRect
+
+        pixmap = QPixmap(591, 100)
+        pixmap.fill(Qt.white)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        painter.setBrush(Qt.blue)
+        painter.drawRect(200, 40, 200, 30)
+        painter.drawRect(220, 20, 160, 20)
+
+        painter.setBrush(Qt.black)
+        painter.drawEllipse(220, 60, 30, 30)
+        painter.drawEllipse(350, 60, 30, 30)
+
+        painter.setPen(Qt.red)
+        painter.setFont(painter.font())
+        painter.drawText(QRect(0, 0, 591, 100), Qt.AlignCenter, "⛽ КАЛЬКУЛЯТОР РАСХОДА ТОПЛИВА 🚗")
+
+        painter.end()
+        self.image_label.setPixmap(pixmap)
 
     def validate_inputs(self):
         try:
@@ -565,14 +638,7 @@ class FuelCalculator(QMainWindow):
             return
 
         try:
-            try:
-                with open('.venv/fuel_history.json', 'r', encoding='utf-8') as f:
-                    history = json.load(f)
-            except FileNotFoundError:
-                history = []
-
             record = {
-                'date': datetime.datetime.now().strftime("%d.%m.%Y %H:%M"),
                 'distance': self.current_calculation['distance'],
                 'fuel': self.current_calculation['fuel'],
                 'price': self.current_calculation['price'],
@@ -581,11 +647,7 @@ class FuelCalculator(QMainWindow):
                 'cost_per_km': self.current_calculation['cost_per_km']
             }
 
-            history.append(record)
-
-            with open('.venv/fuel_history.json', 'w', encoding='utf-8') as f:
-                json.dump(history, f, ensure_ascii=False, indent=2)
-
+            self.db.save_calculation(record)
             QMessageBox.information(self, "Успех", "Расчет сохранен в историю")
 
         except Exception as e:
@@ -600,9 +662,7 @@ class FuelCalculator(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
     calculator = FuelCalculator()
     calculator.show()
 
     sys.exit(app.exec_())
-
