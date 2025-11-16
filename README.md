@@ -25,4 +25,4 @@
 # Требования:
 Python 3.9
 PyQt5
-SQLite3 (входит в стандартную поставку Python)
+SQLite
